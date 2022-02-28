@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
 
     int* output_serial = new int[width*height];
     int* output_thread = new int[width*height];
-    
+
     //
     // Run the serial implementation.  Run the code three times and
     // take the minimum to get a good estimate.
