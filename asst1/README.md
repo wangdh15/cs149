@@ -309,6 +309,10 @@ the foreach loop to yield a more straightforward implementation.
 
 If you look into detailed technical material about the CPUs in the myth machines, you will find there are a complicated set of rules about how many scalar and vector instructions can be run per clock.  For the purposes of this assignment, you can assume that there are about as many 8-wide vector execution units as there are scalar execution units for floating point math.
 
+answer:
+因为计算负载分配不均匀的情况导致的。在v2中这种现象更为明显，因为存在单个亮点拉低了周围暗点的情况。V1的情况要稍微好一些。
+所以在v1达到了 5.00x 的加速比，在v2达到了 4.23x的加速比。
+
 ### Program 3, Part 2: ISPC Tasks (10 of 20 points) ###
 
 ISPCs SPMD execution model and mechanisms like `foreach` facilitate the creation
@@ -337,6 +341,10 @@ different CPU cores).
   performance that exceeds the sequential version of the code by over 32 times!
   How did you determine how many tasks to create? Why does the
   number you chose work best?
+
+answer: 
+一般选择和自己CPU物理线程数相同个数的task数。
+
 3.  _Extra Credit: (2 points)_ What are differences between the thread
   abstraction (used in Program 1) and the ISPC task abstraction? There
   are some obvious differences in semantics between the (create/join
@@ -376,16 +384,35 @@ Note: This problem is a review to double-check your understanding, as it covers 
   single CPU core (no tasks) and when using all cores (with tasks). What
   is the speedup due to SIMD parallelization? What is the speedup due to
   multi-core parallelization?
+
+answer:
+SIMD: 4.28x.  SIMD + task: 25.08x
+Task: 25.8 / 4.28 = 6.03
+
 2.  Modify the contents of the array values to improve the relative speedup
   of the ISPC implementations. Construct a specifc input that __maximizes speedup over the sequential version of the code__ and report the resulting speedup achieved (for both the with- and without-tasks ISPC implementations). Does your modification improve SIMD speedup?
   Does it improve multi-core speedup (i.e., the benefit of moving from ISPC without-tasks to ISPC with tasks)? Please explain why.
+
+answer:
+将所有的values都设置成一样的，这样SIMD就不会又mask，不会浪费。
+达到了SIMD: 6.39x, SIMD + Task: 41x。 Task: 41 / 6.39 = 6.42
+
 3.  Construct a specific input for `sqrt` that __minimizes speedup for ISPC (without-tasks) over the sequential version of the code__. Describe this input, describe why you chose it, and report the resulting relative performance of the ISPC implementations. What is the reason for the loss in efficiency?
     __(keep in mind we are using the `--target=avx2` option for ISPC, which generates 8-wide SIMD instructions)__.
+
+answer:
+通过将下标为8的倍数的位置设置为较靠近3的数字，然后将其他的设置为1.这样的话，每次都会有7个运算单元
+被mask从而被浪费。
+
+SIMD: 0.91x  SIMD + task: 4.68x Task = 4.68 / 0.91 = 5.14
+
 4.  _Extra Credit: (up to 2 points)_ Write your own version of the `sqrt`
  function manually using AVX2 intrinsics. To get credit your
     implementation should be nearly as fast (or faster) than the binary
     produced using ISPC. You may find the [Intel Intrinsics Guide](https://software.intel.com/sites/landingpage/IntrinsicsGuide/)
     very helpful.
+
+TODO.
 
 ## Program 5: BLAS `saxpy` (15 points) ##
 
