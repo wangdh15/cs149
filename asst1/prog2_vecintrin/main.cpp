@@ -249,7 +249,34 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
-  
+
+  __cs149_mask mask, maskIsZero, maskIsNotZero;
+  __cs149_vec_float result, base;
+  __cs149_vec_int exps;
+  __cs149_vec_int zero = _cs149_vset_int(0);
+  __cs149_vec_int ones = _cs149_vset_int(1);
+  __cs149_vec_float threshold = _cs149_vset_float(9.999999f);
+  for (int i = 0; i < N; i += VECTOR_WIDTH) {
+    int value_cnt = min(VECTOR_WIDTH, N - i);
+    mask =  _cs149_init_ones(value_cnt);
+    // load data from values
+    _cs149_vload_float(base, values + i, mask);
+   // load data from exponents
+    _cs149_vload_int(exps, exponents + i, mask);
+   // set all result is 1.0
+    result = _cs149_vset_float(1.0f);
+   _cs149_vgt_int(maskIsNotZero, exps, zero, mask);
+   maskIsNotZero = _cs149_mask_and(maskIsNotZero, mask);
+   while (_cs149_cntbits(maskIsNotZero) > 0) {
+    _cs149_vmult_float(result, result, base, maskIsNotZero);
+    _cs149_vsub_int(exps, exps, ones, maskIsNotZero);
+    _cs149_vgt_int(maskIsNotZero, exps, zero, maskIsNotZero);
+   }
+   __cs149_mask gtThreshold;
+   _cs149_vgt_float(gtThreshold, result, threshold, mask);
+   _cs149_vset_float(result, 9.999999f, gtThreshold);
+   _cs149_vstore_float(output + i, result, mask);
+  }
 }
 
 // returns the sum of all elements in values
@@ -266,11 +293,11 @@ float arraySumSerial(float* values, int N) {
 // You can assume N is a multiple of VECTOR_WIDTH
 // You can assume VECTOR_WIDTH is a power of 2
 float arraySumVector(float* values, int N) {
-  
+
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-  
+
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
 
   }

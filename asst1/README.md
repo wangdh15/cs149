@@ -164,7 +164,18 @@ should work with any combination of input array size (`N`) and vector width (`VE
 2.  Run `./myexp -s 10000` and sweep the vector width from 2, 4, 8, to 16. Record the resulting vector
 utilization. You can do this by changing the `#define VECTOR_WIDTH` value in `CS149intrin.h`.
 Does the vector utilization increase, decrease or stay the same as `VECTOR_WIDTH` changes? Why?
+
+![](./imgs/1.png)
+![](./imgs/2.png)
+![](./imgs/3.png)
+![](./imgs/4.png)
+
+answer: 随着 `vector_width` 的增大，利用率是逐渐降低的，这是因为每次迭代都会以当前批次最大的作为上限。
+如果宽度小的话，不会使得每个都迭代那么多次，从而降低了后面闲置的次数。
+
 3.  _Extra credit: (1 point)_ Implement a vectorized version of `arraySumSerial` in `arraySumVector`. Your implementation may assume that `VECTOR_WIDTH` is a factor of the input array size `N`. Whereas the serial implementation has `O(N)` span, your implementation should have at most `O(N / VECTOR_WIDTH + log2(VECTOR_WIDTH))` span.  You may find the `hadd` and `interleave` operations useful.
+
+answer: 见代码。
 
 ## Program 3: Parallel Fractal Generation Using ISPC (20 points) ##
 
