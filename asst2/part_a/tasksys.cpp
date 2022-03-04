@@ -182,10 +182,9 @@ const char* TaskSystemParallelThreadPoolSleeping::name() {
 }
 
 TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int num_threads): ITaskSystem(num_threads),
-    num_total_tasks_(0),
-    runnable_(nullptr),
     stop_(false),
-    task_done_(0) {
+    global_task_id_(0),
+    num_all_undone_task(0) {
     //
     // TODO: CS149 student implementations may decide to perform setup
     // operations (such as thread pool construction) here.
@@ -193,32 +192,55 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     // (requiring changes to tasksys.h).
     //
     threads_.reserve(num_threads);
-    for (int i = 0; i < num_threads; ++i) {
-        threads_.emplace_back([&]() {
-            while (!stop_) {
 
-                std::unique_lock<std::mutex> lk(lk_);
-                // 等待，直到自己被停止或者有新的任务要做
-                if (task_index_.empty()) {
-                    cv_worker_.wait(lk, [&]() {
-                        return stop_ || !task_index_.empty();
-                    });
-                }
-                if (stop_) {
-                    return;
-                }
-                int task_index = task_index_.front();
-                task_index_.pop();
-                // printf("Pop %d task fron queue\n", task_index);
-                lk.unlock();
-                runnable_->runTask(task_index, num_total_tasks_);
-                ++task_done_;
-                // 如果所有的work都做完后，就唤醒等待的主线程
-                if (task_done_ == num_total_tasks_) {
-                    cv_main_.notify_one();
+    auto worker = [&]() {
+        while (!stop_) {
+
+            std::unique_lock<std::mutex> lk(lk_);
+            if (tasks_.empty()) {
+                cv_worker_.wait(lk, [&]() {
+                    return stop_ || !tasks_.empty();
+                });
+            }
+
+            if (stop_) {
+                return;
+            }
+
+            auto work = tasks_.front();
+            tasks_.pop();
+            lk.unlock();
+
+            work.runnable->runTask(work.cur_index, work.num_total_task);
+
+            lk.lock();
+            num_all_undone_task --;
+            auto&  task = task_info_[work.id];
+            task.num_done_task++;
+            if (task.done()) {
+                // printf("TaskID: %d Done\n", task.id);
+                // 当前task的所有work都已经被做完了
+                for (auto x : graph_[task.id]) {
+                    in_degree_[x]--;
+                    if (in_degree_[x] == 0) {
+                        // printf("TaskID: %d enqueue\n", x);
+                        auto& tmp_task = task_info_[x];
+                        for (int i = 0; i < tmp_task.num_total_task; ++i) {
+                            tasks_.push({x, tmp_task.runnable, i, tmp_task.num_total_task});
+                        }
+                        cv_worker_.notify_all();
+                    }
                 }
             }
-        });
+            if (num_all_undone_task == 0) {
+                cv_main_.notify_all();
+            }
+        }
+    };
+
+
+    for (int i = 0; i < num_threads; ++i) {
+        threads_.emplace_back(worker);
     }
 }
 
@@ -229,6 +251,7 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     // Implementations are free to add new class member variables
     // (requiring changes to tasksys.h).
     //
+    sync();
     stop_ = true;
     cv_worker_.notify_all();
     for (auto& thread : threads_) {
@@ -244,25 +267,8 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     // method in Parts A and B.  The implementation provided below runs all
     // tasks sequentially on the calling thread.
     //
-    runnable_ = runnable;
-    task_done_ = 0;
-    num_total_tasks_ = num_total_tasks;
-    {
-        std::lock_guard<std::mutex> lk(lk_);
-        assert(task_index_.empty());
-        for (int i = 0; i < num_total_tasks; ++i) {
-            task_index_.push(i);
-        }
-        // printf("Main thread: enqueue %d tasks\n", num_total_tasks);
-    }
-    cv_worker_.notify_all();
-    std::unique_lock<std::mutex> lk(lk_);
-    if (task_done_ != num_total_tasks) {
-        cv_main_.wait(lk, [&]() {
-            return task_done_ == num_total_tasks;
-        });
-    }
-    // printf("Main thread is notified\n");
+    runAsyncWithDeps(runnable, num_total_tasks, {});
+    sync();
 }
 
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
@@ -272,8 +278,29 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     //
     // TODO: CS149 students will implement this method in Part B.
     //
+    std::lock_guard<std::mutex> lk(lk_);
+    TaskID cur_task_id = global_task_id_++;
+    // printf("TaskID: %d Call Async\n", cur_task_id);
+    task_info_[cur_task_id] = {cur_task_id, runnable, num_total_tasks, 0};
 
-    return 0;
+    for (auto x : deps) {
+        auto& task = task_info_[x];
+        if (!task.done()) {
+            graph_[x].push_back(cur_task_id);
+            in_degree_[cur_task_id]++;
+        }
+    }
+
+    if (in_degree_[cur_task_id] == 0) {
+        // printf("TaskID: %d, enqueue\n", cur_task_id);
+       for (int i = 0; i < num_total_tasks; ++i) {
+           tasks_.push({cur_task_id, runnable, i, num_total_tasks});
+       }
+       cv_worker_.notify_all();
+    }
+    num_all_undone_task += num_total_tasks;
+
+    return cur_task_id;
 }
 
 void TaskSystemParallelThreadPoolSleeping::sync() {
@@ -281,6 +308,13 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     //
     // TODO: CS149 students will modify the implementation of this method in Part B.
     //
+    std::unique_lock<std::mutex> lk(lk_);
+    if (num_all_undone_task != 0) {
+        cv_main_.wait(lk, [&]() {
+            return num_all_undone_task == 0;
+        });
+    }
+    assert(num_all_undone_task == 0);
 
     return;
 }

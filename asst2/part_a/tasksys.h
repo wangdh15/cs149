@@ -8,6 +8,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <unordered_map>
 
 /*
  * TaskSystemSerial: This class is the student's implementation of a
@@ -86,15 +87,41 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
                                 const std::vector<TaskID>& deps);
         void sync();
 private:
-    std::vector<std::thread> threads_;
-    int num_total_tasks_;
-    IRunnable *runnable_;
-    std::queue<int> task_index_;
-    std::mutex lk_;
+
+    struct TaskInfo {
+        TaskID id; // task的ID
+        IRunnable* runnable;
+        int num_total_task; // 所有的任务数
+        int num_done_task; // 已经完成的任务数
+        bool done() const {
+            return num_total_task == num_done_task;
+        }
+    };
+
+
+    struct WorkInfo {
+        TaskID id; // work所属的task
+        IRunnable* runnable;
+        int cur_index;
+        int num_total_task;
+    };
+
     bool stop_;
-    std::atomic<int> task_done_;
-    std::condition_variable cv_worker_;
-    std::condition_variable cv_main_;
+
+    TaskID global_task_id_;
+    std::mutex lk_;
+    std::condition_variable cv_worker_; // worker线程等待的队列
+    std::condition_variable cv_main_; // sync线程等待的队列
+
+    // 所有加入，但是还没有完成的task的总数，包括不满足条件的
+    int num_all_undone_task;
+
+    std::vector<std::thread> threads_; // 所有的worker线程
+    std::unordered_map<TaskID, std::vector<int>> graph_; // 维护当前图
+    std::unordered_map<TaskID, int> in_degree_; // 每个task的入度
+    std::queue<WorkInfo> tasks_; //  所有需要被执行的任务
+    std::unordered_map<TaskID, TaskInfo> task_info_; // 每个任务的信息
+
 };
 
 #endif
