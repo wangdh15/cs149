@@ -195,6 +195,9 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     // (requiring changes to tasksys.h).
     //
     threads_.reserve(num_threads);
+    graph_.reserve(N);
+    in_degree_.reserve(N);
+    task_info_.reserve(N);
 
     auto worker = [&]() {
         while (!stop_) {
@@ -284,7 +287,12 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     std::lock_guard<std::mutex> lk(lk_);
     TaskID cur_task_id = global_task_id_++;
     // printf("TaskID: %d Call Async\n", cur_task_id);
-    task_info_[cur_task_id] = {cur_task_id, runnable, num_total_tasks, 0};
+    task_info_.push_back({cur_task_id, runnable, num_total_tasks, 0});
+    in_degree_.emplace_back(0);
+    graph_.emplace_back();
+    assert(task_info_.size() == global_task_id_);
+    assert(in_degree_.size() == global_task_id_);
+    assert(graph_.size() == global_task_id_);
 
     for (auto x : deps) {
         auto& task = task_info_[x];

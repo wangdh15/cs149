@@ -117,11 +117,14 @@ private:
     int num_all_undone_task;
 
     std::vector<std::thread> threads_; // 所有的worker线程
-    std::unordered_map<TaskID, std::vector<int>> graph_; // 维护当前图
-    std::unordered_map<TaskID, int> in_degree_; // 每个task的入度
+    std::vector<std::vector<int>> graph_;
+    // std::unordered_map<TaskID, std::vector<int>> graph_; // 维护当前图
+    std::vector<int> in_degree_;
+    // std::unordered_map<TaskID, int> in_degree_; // 每个task的入度
     std::queue<WorkInfo> tasks_; //  所有需要被执行的任务
-    std::unordered_map<TaskID, TaskInfo> task_info_; // 每个任务的信息
-
+    std::vector<TaskInfo> task_info_;
+    // std::unordered_map<TaskID, TaskInfo> task_info_; // 每个任务的信息
+    static constexpr int N = 1024;
 };
 
 #endif
