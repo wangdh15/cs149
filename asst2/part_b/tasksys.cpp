@@ -233,6 +233,7 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(
   bool ok = true;
   {
     std::lock_guard<std::mutex> lk(lk_graph_);
+    tasks_info_[cur_task_id] = {runnable, num_total_tasks};
     // 维护依存图
     all_undone_task_ += num_total_tasks;
     for (auto x : deps) {
