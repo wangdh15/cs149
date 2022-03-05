@@ -2,6 +2,8 @@
 #include <cassert>
 #include <thread>
 
+// #define DEBUG
+
 
 IRunnable::~IRunnable() {}
 
@@ -200,6 +202,9 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     task_info_.reserve(N);
 
     auto worker = [&]() {
+        IRunnable *runnable;
+        int cur_index;
+        TaskID task_id;
         while (!stop_) {
 
             std::unique_lock<std::mutex> lk(lk_);
@@ -213,33 +218,44 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
                 return;
             }
 
-            auto work = tasks_.front();
-            tasks_.pop();
+            auto& work = tasks_.front();
+            task_id = work.id;
+            runnable = task_info_[task_id].runnable;
+            cur_index = work.cur_index++;
+            if (work.cur_index >= task_info_[task_id].num_total_task) {
+               tasks_.pop();
+            }
+            #ifdef DEBUG
+            printf("TaskID: %d, cur_index: %d be called\n", task_id, cur_index);
+            #endif
             lk.unlock();
 
-            work.runnable->runTask(work.cur_index, work.num_total_task);
+            runnable->runTask(cur_index, task_info_[task_id].num_total_task);
 
             lk.lock();
-            num_all_undone_task --;
-            auto&  task = task_info_[work.id];
-            task.num_done_task++;
-            if (task.done()) {
-                // printf("TaskID: %d Done\n", task.id);
+            task_info_[task_id].num_done_work++;
+            if (task_info_[task_id].num_done_work == task_info_[task_id].num_total_task) {
+                // lk.lock();
+                #ifdef DEBUG
+                printf("TaskID: %d Done\n", task_id);
+                #endif
                 // 当前task的所有work都已经被做完了
-                for (auto x : graph_[task.id]) {
+                for (auto x : graph_[task_id]) {
                     in_degree_[x]--;
                     if (in_degree_[x] == 0) {
-                        // printf("TaskID: %d enqueue\n", x);
-                        auto& tmp_task = task_info_[x];
-                        for (int i = 0; i < tmp_task.num_total_task; ++i) {
-                            tasks_.push({x, tmp_task.runnable, i, tmp_task.num_total_task});
-                        }
+
+                        #ifdef DEBUG
+                        printf("TaskID: %d enqueue\n", x);
+                        #endif
+
+                        tasks_.push({x, 0});
                         cv_worker_.notify_all();
                     }
                 }
-            }
-            if (num_all_undone_task == 0) {
-                cv_main_.notify_all();
+                num_all_undone_task -= 1;
+                if (num_all_undone_task == 0) {
+                    cv_main_.notify_one();
+                }
             }
         }
     };
@@ -286,30 +302,39 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     //
     std::lock_guard<std::mutex> lk(lk_);
     TaskID cur_task_id = global_task_id_++;
-    // printf("TaskID: %d Call Async\n", cur_task_id);
-    task_info_.push_back({cur_task_id, runnable, num_total_tasks, 0});
+
+    #ifdef DEBUG
+    printf("TaskID: %d Call Async\n", cur_task_id);
+    #endif
+
+    task_info_.emplace_back(cur_task_id, runnable, num_total_tasks, 0);
     in_degree_.emplace_back(0);
     graph_.emplace_back();
+
+    #ifdef DEBUG
     assert(task_info_.size() == global_task_id_);
     assert(in_degree_.size() == global_task_id_);
     assert(graph_.size() == global_task_id_);
+    #endif
 
     for (auto x : deps) {
         auto& task = task_info_[x];
-        if (!task.done()) {
+        if (task.num_total_task != task.num_done_work) {
             graph_[x].push_back(cur_task_id);
             in_degree_[cur_task_id]++;
         }
     }
 
     if (in_degree_[cur_task_id] == 0) {
-        // printf("TaskID: %d, enqueue\n", cur_task_id);
-       for (int i = 0; i < num_total_tasks; ++i) {
-           tasks_.push({cur_task_id, runnable, i, num_total_tasks});
-       }
-       cv_worker_.notify_all();
+
+        #ifdef DEBUG
+        printf("TaskID: %d, enqueue\n", cur_task_id);
+        #endif
+
+        tasks_.push({cur_task_id, 0});
+        cv_worker_.notify_all();
     }
-    num_all_undone_task += num_total_tasks;
+    num_all_undone_task += 1;
 
     return cur_task_id;
 }
@@ -325,7 +350,10 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
             return num_all_undone_task == 0;
         });
     }
+
+    #ifdef DEBUG
     assert(num_all_undone_task == 0);
+    #endif
 
     return;
 }

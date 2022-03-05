@@ -92,18 +92,18 @@ private:
         TaskID id; // task的ID
         IRunnable* runnable;
         int num_total_task; // 所有的任务数
-        int num_done_task; // 已经完成的任务数
-        bool done() const {
-            return num_total_task == num_done_task;
-        }
+        int num_done_work; // 当前task已经完成的任务
+        TaskInfo(TaskID _id, IRunnable* _runnable, int _num_total_task, int _num_donw_work):
+            id(_id), runnable(_runnable), num_total_task(_num_total_task), num_done_work(_num_donw_work) {}
+        // std::atomic<int> num_done_work; // 当前task已经完成的任务
+        // TaskInfo(TaskID _id, IRunnable* _runnable, int _num_total_task):
+        //     id(_id), runnable(_runnable), num_total_task(_num_total_task){}
     };
 
 
     struct WorkInfo {
         TaskID id; // work所属的task
-        IRunnable* runnable;
         int cur_index;
-        int num_total_task;
     };
 
     bool stop_;
