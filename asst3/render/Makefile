@@ -15,13 +15,13 @@ LOGS	   := logs
 ARCH=$(shell uname | sed -e 's/-.*//g')
 OBJDIR=objs
 CXX=g++ -m64
-CXXFLAGS=-O3 -Wall -g
+CXXFLAGS=-O3 -Wall -g -std=c++11
 HOSTNAME=$(shell hostname)
 
 LIBS       :=
 FRAMEWORKS :=
 
-NVCCFLAGS=-O3 -m64 --gpu-architecture compute_35
+NVCCFLAGS=-O3 -m64 --gpu-architecture compute_61 -std=c++11
 LIBS += GL glut cudart
 
 ifneq ($(wildcard /opt/cuda-8.0/.*),)
@@ -29,7 +29,7 @@ ifneq ($(wildcard /opt/cuda-8.0/.*),)
 LDFLAGS=-L/opt/cuda-8.0/lib64/ -lcudart
 else
 # GHC
-LDFLAGS=-L/usr/local/cuda/lib64/ -lcudart
+LDFLAGS=-L/usr/local/cuda-9.0/lib64/ -lcudart
 endif
 
 LDLIBS  := $(addprefix -l, $(LIBS))
