@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
+#include <cmath>
 #include <string>
 
 void saxpyCuda(int N, float alpha, float* x, float* y, float* result);
@@ -12,6 +13,18 @@ void usage(const char* progname) {
     printf("Program Options:\n");
     printf("  -n  --arraysize <INT>  Number of elements in arrays\n");
     printf("  -?  --help             This message\n");
+}
+
+
+bool check(int N, float alpha, float* x, float* y, float* result) {
+
+    for (int i = 0; i < N; ++i) {
+        if (abs(alpha * x[i] + y[i] - result[i]) > 1e-5) {
+            return false;
+        }
+    }
+    return true;
+
 }
 
 
@@ -54,15 +67,19 @@ int main(int argc, char** argv)
    }
 
     printCudaInfo();
-    
+
     printf("Running 3 timing tests:\n");
     for (int i=0; i<3; i++) {
       saxpyCuda(N, alpha, xarray, yarray, resultarray);
+      if (!check(N, alpha, xarray, yarray, resultarray)) {
+          printf("Error!\n");
+      } else {
+          printf("Pass!\n");
+      }
     }
 
     delete [] xarray;
     delete [] yarray;
     delete [] resultarray;
-
     return 0;
 }

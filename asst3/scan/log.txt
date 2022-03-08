@@ -1,0 +1,67 @@
+---------------------------------------------------------
+Found 4 CUDA devices
+Device 0: NVIDIA GeForce GTX 1080
+   SMs:        20
+   Global mem: 8120 MB
+   CUDA Cap:   6.1
+Device 1: NVIDIA GeForce GTX 1080
+   SMs:        20
+   Global mem: 8120 MB
+   CUDA Cap:   6.1
+Device 2: NVIDIA GeForce GTX 1080
+   SMs:        20
+   Global mem: 8120 MB
+   CUDA Cap:   6.1
+Device 3: NVIDIA GeForce GTX 1080
+   SMs:        20
+   Global mem: 8120 MB
+   CUDA Cap:   6.1
+---------------------------------------------------------
+Array size: 64
+block: 1, thread: 64
+cmp: idx: 41, value: 9
+1 blocks, 32 thread !
+1 blocks, 16 thread !
+1 blocks, 8 thread !
+1 blocks, 4 thread !
+1 blocks, 2 thread !
+1 blocks, 1 thread !
+1 blocks, 1 thread !
+1 blocks, 2 thread !
+1 blocks, 4 thread !
+1 blocks, 8 thread !
+1 blocks, 16 thread !
+1 blocks, 32 thread !
+fill: idx: 41, prefix_idx: 0, value: 9
+block: 1, thread: 64
+cmp: idx: 41, value: 9
+1 blocks, 32 thread !
+1 blocks, 16 thread !
+1 blocks, 8 thread !
+1 blocks, 4 thread !
+1 blocks, 2 thread !
+1 blocks, 1 thread !
+1 blocks, 1 thread !
+1 blocks, 2 thread !
+1 blocks, 4 thread !
+1 blocks, 8 thread !
+1 blocks, 16 thread !
+1 blocks, 32 thread !
+fill: idx: 41, prefix_idx: 0, value: 9
+block: 1, thread: 64
+cmp: idx: 41, value: 9
+1 blocks, 32 thread !
+1 blocks, 16 thread !
+1 blocks, 8 thread !
+1 blocks, 4 thread !
+1 blocks, 2 thread !
+1 blocks, 1 thread !
+1 blocks, 1 thread !
+1 blocks, 2 thread !
+1 blocks, 4 thread !
+1 blocks, 8 thread !
+1 blocks, 16 thread !
+1 blocks, 32 thread !
+fill: idx: 41, prefix_idx: 0, value: 9
+Student GPU time: 0.216 ms
+Find_repeats outputs are correct!
