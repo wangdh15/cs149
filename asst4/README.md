@@ -191,4 +191,4 @@ Please submit your work using Gradescope.
 1. __Please submit your writeup as the file `writeup.pdf` in the Gradescope assignment Programming Assignment 4 (Writeup Submission).__
 2. __Please submit your code under the folder `code` in the Gradescope assignment Programming Assignment 4 (Code Submission).__  Just submit your full assignment 4 source tree. To keep submission sizes small, please do a `make clean` in the program directories prior to creating the archive, and remove any residual output, etc. Before submitting the source files, make sure that all code is compilable and runnable! We should be able to simply make, then execute your programs in the `/bfs` the `/pagerank` directories without manual intervention. 
 
-Our grading scripts will rerun the checker code allowing us to verify your score matches what you submitted in the `writeup.pdf`.  We might also try to run your code on other datasets to further examine its correctness.
+Our grading scripts will rerun the checker code allowing us to verify your score matches what you submitted in the `writeup.pdf`.  We might also try to run your code on other datasets to further examine its correctness. 
