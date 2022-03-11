@@ -4,10 +4,12 @@
 #include <cmath>
 #include <omp.h>
 #include <utility>
+#include <vector>
 
 #include "../common/CycleTimer.h"
 #include "../common/graph.h"
 
+// #define DEBUG
 
 // pageRank --
 //
@@ -19,17 +21,61 @@
 void pageRank(Graph g, double* solution, double damping, double convergence)
 {
 
-
   // initialize vertex weights to uniform probability. Double
   // precision scores are used to avoid underflow for large graphs
 
   int numNodes = num_nodes(g);
   double equal_prob = 1.0 / numNodes;
-  for (int i = 0; i < numNodes; ++i) {
-    solution[i] = equal_prob;
+
+  std::vector<double> ans(numNodes, equal_prob);
+  std::vector<double> tmp(numNodes);
+
+  bool converged{false};
+
+  while (!converged) {
+
+    double no_out_score = 0;
+
+    #ifndef DEBUG
+    #pragma omp parallel for reduction(+:no_out_score)
+    #endif
+    for (int i = 0; i < numNodes; ++i) {
+      no_out_score += outgoing_size(g, i) == 0 ? damping * ans[i] / numNodes : 0;
+    }
+
+
+    #ifndef DEBUG
+    #pragma omp parallel for
+    #endif
+    for (int i = 0; i < numNodes; ++i) {
+      double tmp_score = 0;
+      const Vertex* start = incoming_begin(g, i);
+      const Vertex* end = incoming_end(g, i);
+      for (const Vertex* v = start; v != end; ++v) {
+        tmp_score += ans[*v] / outgoing_size(g, *v);
+      }
+      tmp_score = tmp_score * damping + (1.0 - damping) / numNodes;
+      tmp_score += no_out_score;
+      tmp[i] = tmp_score;
+    }
+
+    double diff = 0;
+    #ifndef DEBUG
+    #pragma omp parallel for reduction(+:diff)
+    #endif
+    for (int i = 0; i < numNodes; ++i) {
+      diff += std::fabs(ans[i] - tmp[i]);
+    }
+
+    #ifdef DEBUG
+    printf("DIFF: %lf | CONVER: %lf\n", diff, convergence);
+    #endif
+    std::swap(ans, tmp);
+    converged = diff < convergence;
   }
-  
-  
+
+  memcpy(solution, &*ans.begin(), sizeof(double) * numNodes);
+
   /*
      CS149 students: Implement the page rank algorithm here.  You
      are expected to parallelize the algorithm using openMP.  Your
