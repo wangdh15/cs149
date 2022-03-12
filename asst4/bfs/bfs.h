@@ -4,6 +4,7 @@
 //#define DEBUG
 
 #include "common/graph.h"
+#include <stdlib.h>
 
 struct solution
 {
@@ -13,7 +14,7 @@ struct solution
 struct vertex_set {
   // # of vertices in the set
   int count;
-  // max size of buffer vertices 
+  // max size of buffer vertices
   int max_vertices;
   // array of vertex ids in set
   int *vertices;

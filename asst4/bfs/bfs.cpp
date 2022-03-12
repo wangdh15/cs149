@@ -11,6 +11,7 @@
 
 #define ROOT_NODE_ID 0
 #define NOT_VISITED_MARKER -1
+// #define VERBOSE
 
 void vertex_set_clear(vertex_set* list) {
     list->count = 0;
@@ -22,6 +23,52 @@ void vertex_set_init(vertex_set* list, int count) {
     vertex_set_clear(list);
 }
 
+void vertex_set_free(vertex_set* list) {
+    free(list->vertices);
+}
+
+// Take one step of "top-down" BFS.  For each vertex on the frontier,
+// follow all outgoing edges, and add all neighboring vertices to the
+// new_frontier.
+void top_down_step_ref(
+    Graph g,
+    vertex_set* frontier,
+    vertex_set* new_frontier,
+    int* distances)
+{
+    #pragma omp parallel
+    {
+        int local_count = 0;
+        int* local_frontier = (int*)malloc(sizeof(int) * (g->num_nodes));
+
+        #pragma omp for schedule(dynamic, 200)
+        for (int i=0; i<frontier->count; i++) {
+
+            int node = frontier->vertices[i];
+
+            int start_edge = g->outgoing_starts[node];
+            int end_edge = (node == g->num_nodes - 1)
+                            ? g->num_edges
+                            : g->outgoing_starts[node + 1];
+
+            // attempt to add all neighbors to the new frontier
+            for (int neighbor=start_edge; neighbor<end_edge; neighbor++) {
+                int outgoing = g->outgoing_edges[neighbor];
+
+                if (distances[outgoing] == NOT_VISITED_MARKER &&
+                    __sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, distances[node] + 1)) {
+                    local_frontier[local_count++] = outgoing;
+                }
+           }
+        }
+
+        int start_idx = __sync_fetch_and_add(&new_frontier->count, local_count);
+        memcpy(new_frontier->vertices + start_idx, local_frontier, local_count * sizeof(int));
+        free(local_frontier);
+    }
+}
+
+
 // Take one step of "top-down" BFS.  For each vertex on the frontier,
 // follow all outgoing edges, and add all neighboring vertices to the
 // new_frontier.
@@ -32,25 +79,38 @@ void top_down_step(
     int* distances)
 {
 
-    for (int i=0; i<frontier->count; i++) {
+    #pragma omp parallel
+    {
+        vertex_set local_list;
+        vertex_set_init(&local_list, g->num_edges);
 
-        int node = frontier->vertices[i];
+        #pragma omp for schedule(dynamic, 200)
+        for (int i=0; i<frontier->count; i++) {
+            int node = frontier->vertices[i];
+            int start_edge = g->outgoing_starts[node];
+            int end_edge = (node == g->num_nodes - 1)
+                            ? g->num_edges
+                            : g->outgoing_starts[node + 1];
 
-        int start_edge = g->outgoing_starts[node];
-        int end_edge = (node == g->num_nodes - 1)
-                           ? g->num_edges
-                           : g->outgoing_starts[node + 1];
+            // attempt to add all neighbors to the new frontier
+            // #pragma omp parallel for
 
-        // attempt to add all neighbors to the new frontier
-        for (int neighbor=start_edge; neighbor<end_edge; neighbor++) {
-            int outgoing = g->outgoing_edges[neighbor];
-
-            if (distances[outgoing] == NOT_VISITED_MARKER) {
-                distances[outgoing] = distances[node] + 1;
-                int index = new_frontier->count++;
-                new_frontier->vertices[index] = outgoing;
+            int new_dis = distances[node] + 1;
+            for (int neighbor=start_edge; neighbor<end_edge; neighbor++) {
+                int outgoing = g->outgoing_edges[neighbor];
+                if (distances[outgoing] == NOT_VISITED_MARKER && __sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, new_dis)) {
+                    local_list.vertices[local_list.count++] = outgoing;
+                }
             }
         }
+
+        // int start_idx = __sync_fetch_and_add(&new_frontier->count, local_list.count);
+        int start_idx = new_frontier->count;
+        while (!__sync_bool_compare_and_swap(&new_frontier->count, start_idx, start_idx + local_list.count)) {
+            start_idx = new_frontier->count;
+        }
+        memcpy(new_frontier->vertices + start_idx, local_list.vertices, sizeof(int) * local_list.count);
+        vertex_set_free(&local_list);
     }
 }
 
@@ -84,6 +144,7 @@ void bfs_top_down(Graph graph, solution* sol) {
 
         vertex_set_clear(new_frontier);
 
+        // top_down_step_ref(graph, frontier, new_frontier, sol->distances);
         top_down_step(graph, frontier, new_frontier, sol->distances);
 
 #ifdef VERBOSE
