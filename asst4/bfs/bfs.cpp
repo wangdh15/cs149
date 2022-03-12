@@ -119,6 +119,48 @@ void bfs_top_down(Graph graph, solution* sol) {
     }
 }
 
+void bottom_up_step_series(
+    Graph g,
+    vertex_set* frontier,
+    vertex_set* new_frontier,
+    int* distances) {
+
+    vertex_set list;
+    vertex_set_init(&list, g->num_edges);
+
+    for (int i = 0; i < g->num_nodes; ++i) {
+        #ifdef VERBOSE
+        printf("ID: %d, distance: %d\n", i, distances[i]);
+        #endif
+
+        if (distances[i] == NOT_VISITED_MARKER) {
+            for (auto j = incoming_begin(g, i); j < incoming_end(g, i); ++j) {
+                int fa = *j;
+                #ifdef VERBOSE
+                printf("ID: %d, FA: %d\n", i, fa);
+                #endif
+                if (distances[fa] != NOT_VISITED_MARKER) {
+                    list.vertices[list.count++] = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    #ifdef VERBOSE
+    printf("COUNT: %d\n", list.count);
+    #endif
+
+    int dis_plus_1 = distances[frontier->vertices[0]] + 1;
+    for (int i = 0; i < list.count; ++i) {
+        distances[list.vertices[i]] = dis_plus_1;
+    }
+    memcpy(new_frontier->vertices, list.vertices, sizeof(int) * list.count);
+    new_frontier->count += list.count;
+    vertex_set_free(&list);
+}
+
+
 void bfs_bottom_up(Graph graph, solution* sol)
 {
     // CS149 students:
@@ -132,6 +174,44 @@ void bfs_bottom_up(Graph graph, solution* sol)
     // As was done in the top-down case, you may wish to organize your
     // code by creating subroutine bottom_up_step() that is called in
     // each step of the BFS process.
+
+    vertex_set list1;
+    vertex_set list2;
+    vertex_set_init(&list1, graph->num_nodes);
+    vertex_set_init(&list2, graph->num_nodes);
+
+    vertex_set* frontier = &list1;
+    vertex_set* new_frontier = &list2;
+
+    // initialize all nodes to NOT_VISITED
+    for (int i=0; i<graph->num_nodes; i++)
+        sol->distances[i] = NOT_VISITED_MARKER;
+
+    // setup frontier with the root node
+    frontier->vertices[frontier->count++] = ROOT_NODE_ID;
+    sol->distances[ROOT_NODE_ID] = 0;
+
+    while (frontier->count != 0) {
+
+#ifdef VERBOSE
+        double start_time = CycleTimer::currentSeconds();
+#endif
+
+        vertex_set_clear(new_frontier);
+
+        bottom_up_step_series(graph, frontier, new_frontier, sol->distances);
+
+#ifdef VERBOSE
+    double end_time = CycleTimer::currentSeconds();
+    printf("frontier=%-10d %.4f sec\n", frontier->count, end_time - start_time);
+#endif
+
+        // swap pointers
+        vertex_set* tmp = frontier;
+        frontier = new_frontier;
+        new_frontier = tmp;
+    }
+
 }
 
 void bfs_hybrid(Graph graph, solution* sol)
