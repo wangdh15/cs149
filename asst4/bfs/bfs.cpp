@@ -119,45 +119,55 @@ void bfs_top_down(Graph graph, solution* sol) {
     }
 }
 
-void bottom_up_step_series(
+void bottom_up_step(
     Graph g,
     vertex_set* frontier,
     vertex_set* new_frontier,
     int* distances) {
 
-    vertex_set list;
-    vertex_set_init(&list, g->num_edges);
+    int cur_dis = distances[frontier->vertices[0]];
 
-    for (int i = 0; i < g->num_nodes; ++i) {
-        #ifdef VERBOSE
-        printf("ID: %d, distance: %d\n", i, distances[i]);
-        #endif
+    int dis_plus_1 = cur_dis + 1;
 
-        if (distances[i] == NOT_VISITED_MARKER) {
-            for (auto j = incoming_begin(g, i); j < incoming_end(g, i); ++j) {
-                int fa = *j;
-                #ifdef VERBOSE
-                printf("ID: %d, FA: %d\n", i, fa);
-                #endif
-                if (distances[fa] != NOT_VISITED_MARKER) {
-                    list.vertices[list.count++] = i;
-                    break;
+    #pragma omp parallel
+    {
+
+        vertex_set list;
+        vertex_set_init(&list, g->num_edges);
+
+        #pragma omp for schedule(dynamic, 200)
+        for (int i = 0; i < g->num_nodes; ++i) {
+
+            #ifdef VERBOSE
+            printf("ID: %d, distance: %d\n", i, distances[i]);
+            #endif
+
+            if (distances[i] == NOT_VISITED_MARKER) {
+                auto be = incoming_begin(g, i);
+                auto en = incoming_end(g, i);
+                for (auto j = be; j < en; ++j) {
+                    int fa = *j;
+                    #ifdef VERBOSE
+                    printf("ID: %d, FA: %d\n", i, fa);
+                    #endif
+                    if (distances[fa] == cur_dis) {
+                        list.vertices[list.count++] = i;
+                        distances[i] = dis_plus_1;
+                        break;
+                    }
                 }
             }
         }
+
+        #ifdef VERBOSE
+        printf("COUNT: %d\n", list.count);
+        #endif
+
+        int start_idx = __sync_fetch_and_add(&new_frontier->count, list.count);
+        memcpy(new_frontier->vertices + start_idx, list.vertices, sizeof(int) * list.count);
+        vertex_set_free(&list);
     }
 
-    #ifdef VERBOSE
-    printf("COUNT: %d\n", list.count);
-    #endif
-
-    int dis_plus_1 = distances[frontier->vertices[0]] + 1;
-    for (int i = 0; i < list.count; ++i) {
-        distances[list.vertices[i]] = dis_plus_1;
-    }
-    memcpy(new_frontier->vertices, list.vertices, sizeof(int) * list.count);
-    new_frontier->count += list.count;
-    vertex_set_free(&list);
 }
 
 
@@ -199,7 +209,7 @@ void bfs_bottom_up(Graph graph, solution* sol)
 
         vertex_set_clear(new_frontier);
 
-        bottom_up_step_series(graph, frontier, new_frontier, sol->distances);
+        bottom_up_step(graph, frontier, new_frontier, sol->distances);
 
 #ifdef VERBOSE
     double end_time = CycleTimer::currentSeconds();
@@ -220,4 +230,48 @@ void bfs_hybrid(Graph graph, solution* sol)
     //
     // You will need to implement the "hybrid" BFS here as
     // described in the handout.
+
+    vertex_set list1;
+    vertex_set list2;
+    vertex_set_init(&list1, graph->num_nodes);
+    vertex_set_init(&list2, graph->num_nodes);
+
+    vertex_set* frontier = &list1;
+    vertex_set* new_frontier = &list2;
+
+    // initialize all nodes to NOT_VISITED
+    for (int i=0; i<graph->num_nodes; i++)
+        sol->distances[i] = NOT_VISITED_MARKER;
+
+    // setup frontier with the root node
+    frontier->vertices[frontier->count++] = ROOT_NODE_ID;
+    sol->distances[ROOT_NODE_ID] = 0;
+
+
+    const int threshold = graph->num_nodes * 0.15;
+
+    while (frontier->count != 0) {
+
+#ifdef VERBOSE
+        double start_time = CycleTimer::currentSeconds();
+#endif
+
+        vertex_set_clear(new_frontier);
+
+        if (frontier->count >= threshold) {
+            bottom_up_step(graph, frontier, new_frontier, sol->distances);
+        }   else {
+            top_down_step(graph, frontier, new_frontier, sol->distances);
+        }
+
+#ifdef VERBOSE
+    double end_time = CycleTimer::currentSeconds();
+    printf("frontier=%-10d %.4f sec\n", frontier->count, end_time - start_time);
+#endif
+
+        // swap pointers
+        vertex_set* tmp = frontier;
+        frontier = new_frontier;
+        new_frontier = tmp;
+    }
 }

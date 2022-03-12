@@ -22,27 +22,27 @@ Download the Assignment 4 starter code from the course Github page using:
 
 In this assignment we'd like you to use [OpenMP](http://openmp.org/) for multi-core parallelization. OpenMP is an API and set of C-language extensions that provides compiler support for parallelism. You can also use OpenMP to tell the compiler to parallelize iterations of `for` loops, and to manage mutual exclusion. It is well documented online, but here is a brief example of parallelizing a `for` loop, with mutual exclusion.
 
-    /* The iterations of this for loop may be parallelized by the compiler */      
-    #pragma omp parallel for                                                      
-    for (int i = 0; i < 100; i++) {  
-    
+    /* The iterations of this for loop may be parallelized by the compiler */
+    #pragma omp parallel for
+    for (int i = 0; i < 100; i++) {
+
       /* different iterations of this part of the loop body may be
          run in parallel on different cores */
-    
-      #pragma omp critical                                                          
+
+      #pragma omp critical
       {
         /* This block will be executed by at most one thread at a time. */
-        printf("Thread %d got iteration %lu\n", omp_get_thread_num(), i);           
-      }                                                                             
+        printf("Thread %d got iteration %lu\n", omp_get_thread_num(), i);
+      }
     }
-    
+
 Please see OpenMP documentation for the syntax for how to tell OpenMP to use different forms of static or dynamic scheduling. (For example, `omp parallel for schedule(dynamic 100)` distributes iterations to threads using dynamic scheduling with a chunk size of 100 iterations.  You can think of the implementation as a dynamic work queue where threads in the thread pool pull off 100 iterations at once, like what [we talked about in these lecture slides](http://35.227.169.186/cs149/fall21/lecture/perfopt1/slide_11)).
-    
+
 Here is an example for an atomic counter update in OpenMP.
 
     int my_counter = 0;
-    #pragma omp parallel for                                                        
-    for (int i = 0; i < 100; i++) {                                                      
+    #pragma omp parallel for
+    for (int i = 0; i < 100; i++) {
         if ( ... some condition ...) {
            #pragma omp atomic
            my_counter++;
@@ -71,21 +71,21 @@ The starter code operates on directed graphs, whose implementation you can find 
 
 ## Part 1: Warm up: Implementing Page Rank (16 points) ##
 
-As a simple warm up exercise to get comfortable using the graph data structures, and to get acquainted with a few OpenMP basics, we'd like you to begin by implementing a basic version of the well-known [page rank](https://en.wikipedia.org/wiki/PageRank) algorithm.  
+As a simple warm up exercise to get comfortable using the graph data structures, and to get acquainted with a few OpenMP basics, we'd like you to begin by implementing a basic version of the well-known [page rank](https://en.wikipedia.org/wiki/PageRank) algorithm.
 
 Please take a look at the pseudocode provided to you in the function `pageRank()`, in the file `pagerank/page_rank.cpp.`.  You should implement the function, parallelizing the code with OpenMP.  Just like any other algorithm, first identify independent work and any necessary sychronization.
 
 You can run your code, checking correctness and performance against the staff reference solution using:
 
-    ./pr <PATH_TO_GRAPHS_DIRECTORY>/com-orkut_117m.graph 
-    
+    ./pr <PATH_TO_GRAPHS_DIRECTORY>/com-orkut_117m.graph
+
 If you are working on a myth machine, we've located a copy of the graphs directory at `/afs/ir.stanford.edu/class/cs149/data/asst3_graphs/`.  You can also download the graphs from <http://cs149.stanford.edu/cs149asstdata/all_graphs.tgz>. (Please paste the preceding link into your browser to download the .tgz file, but be careful, this is a 2.2 GB download.) Some interesting real-world graphs include:
 
- * com-orkut_117m.graph 
+ * com-orkut_117m.graph
  * oc-pokec_30m.graph
  * rmat_200m.graph
  * soc-livejournal1_68m.graph
- 
+
 Your useful synthetic, but large graphs include:
 
  * random_500m.graph
@@ -101,9 +101,9 @@ Your code should handle cases where there are no outgoing edges by distributing 
 
 You can also run our grading script via: `./pr_grader <path to graphs directory>`, which will report correctness and a performance points score for a number of graphs.
 
-__NOTE__: a common pitfall students hit when implementing `page_rank` is they find their implementation fails the correctness check based on very small differences between their code's output values and the reference. Since the errors are very small, it's reasonable to assume these are due to differences in the order of floating point arithmetic, and that the checker should be more lenient in its checks.  However, our experience is that this is *almost, almost always an error in the student's code*. 
+__NOTE__: a common pitfall students hit when implementing `page_rank` is they find their implementation fails the correctness check based on very small differences between their code's output values and the reference. Since the errors are very small, it's reasonable to assume these are due to differences in the order of floating point arithmetic, and that the checker should be more lenient in its checks.  However, our experience is that this is *almost, almost always an error in the student's code*.
 
-__Tips:__ 
+__Tips:__
 
 Accumulating into a shared variable can be done by marking the variable as a "reduction" variable in an OpenMP loop.
 
@@ -114,6 +114,12 @@ Accumulating into a shared variable can be done by marking the variable as a "re
          mySum += A[i];
      }
 
+
+最终结果：
+
+![](./imgs/2.png)
+
+
 ## Part 2: Parallel Breadth-First Search ("Top Down") ##
 
 Breadth-first search (BFS) is a common algorithm that might have seen in a prior algorithms class (See [here](https://www.hackerearth.com/practice/algorithms/graphs/breadth-first-search/tutorial/) and [here](https://www.youtube.com/watch?v=oDqjPvD54Ss) for helpful references.)
@@ -122,18 +128,18 @@ Please familiarize yourself with the function `bfs_top_down()` in `bfs/bfs.cpp`,
 You can run bfs using:
 
     ./bfs <PATH_TO_GRAPHS_DIRECTORY>/rmat_200m.graph
-    
+
 (as with page rank, bfs's first argument is a graph file, and an optional second argument is the number of threads.)
 
 When you run `bfs`, you'll see execution time and the frontier size printed for each step in the algorithm.  Correctness will pass for the top-down version (since we've given you a correct sequential implementation), but it will be slow.  (Note that `bfs` will report failures for a "bottom up" and "hybrid" versions of the algorithm, which you will implement later in this assignment.)
 
-In this part of the assignment your job is to parallelize top-down BFS. As with page rank, you'll need to focus on identifying parallelism, as well as inserting the appropriate synchronization to ensure correctness. We wish to remind you that you __should not__ expect to achieve near-perfect speedups on this problem (we'll leave it to you to think about why!). 
+In this part of the assignment your job is to parallelize top-down BFS. As with page rank, you'll need to focus on identifying parallelism, as well as inserting the appropriate synchronization to ensure correctness. We wish to remind you that you __should not__ expect to achieve near-perfect speedups on this problem (we'll leave it to you to think about why!).
 
 __Tips/Hints:__
 
 * Always start by considering what work can be done in parallel.
-* Some parts of the computation may need to be synchronized, for example, by wrapping the appropriate code within a critical region using `#pragma omp critical` or `#pragma omp atomic`.  __However, in this problem you should think about how to make use of the simple atomic operation called `compare and swap`.__  You can read about [GCC's implementation of compare and swap](http://gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/Atomic-Builtins.html), which is exposed to C code as the function `__sync_bool_compare_and_swap`.  If you can figure out how to use compare-and-swap for this problem, you will achieve much higher performance than using a critical region. 
-* Updating a shared counter can be done efficiently using `#pragma omp atomic` before a line like `counter++;`. 
+* Some parts of the computation may need to be synchronized, for example, by wrapping the appropriate code within a critical region using `#pragma omp critical` or `#pragma omp atomic`.  __However, in this problem you should think about how to make use of the simple atomic operation called `compare and swap`.__  You can read about [GCC's implementation of compare and swap](http://gcc.gnu.org/onlinedocs/gcc-4.1.2/gcc/Atomic-Builtins.html), which is exposed to C code as the function `__sync_bool_compare_and_swap`.  If you can figure out how to use compare-and-swap for this problem, you will achieve much higher performance than using a critical region.
+* Updating a shared counter can be done efficiently using `#pragma omp atomic` before a line like `counter++;`.
 * Are there conditions where it is possible to avoid using `compare_and_swap`?  In other words, when you *know* in advance that the comparison will fail?
 * There is a preprocessor macro `VERBOSE` to make it easy to disable useful print per-step timings in your solution (see the top of `bfs/bfs.cpp`).  In general, these printfs occur infrequently enough (only once per BFS step) that they do not notably impact performance, but if you want to disable the printfs during timing, you can use this `#define` as a convenience.
 
@@ -142,7 +148,7 @@ __Tips/Hints:__
 Think about what behavior might cause a performance problem in the BFS implementation from Part 1.2.  An alternative implementation of a breadth-first search step may be more efficient in these situations.  Instead of iterating over all vertices in the frontier and marking all vertices adjacent to the frontier, it is possible to implement BFS by having *each vertex check whether it should be added to the frontier!*  Basic pseudocode for the algorithm is as follows:
 
     for each vertex v in graph:
-        if v has not been visited AND 
+        if v has not been visited AND
            v shares an incoming edge with a vertex u on the frontier:
               add vertex v to frontier;
 
@@ -152,7 +158,7 @@ Please implement a bottom-up BFS to compute the shortest path to all the vertice
 
 __Tips/Hints:__
 
-* It may be useful to think about how you represent the set of unvisited nodes.  Do the top-down and bottom-up versions of the code lend themselves to different implementations?  
+* It may be useful to think about how you represent the set of unvisited nodes.  Do the top-down and bottom-up versions of the code lend themselves to different implementations?
 * How do the synchronization requirements of the bottom-up BFS change?
 
 ## Part 4: Hybrid BFS (70 points) ##
@@ -162,6 +168,11 @@ Notice that in some steps of the BFS, the "bottom up" BFS is signficantly faster
 __Tips/Hints:__
 
 * If you used different representations of the frontier in Parts 1.2 and 1.3, you may have to convert between these representations in the hybrid solution.  How might you efficiently convert between them? Is there an overhead in doing so?
+
+最总结果
+
+![](./imgs/1.png)
+
 
 ## Grading and Handin ##
 
@@ -189,6 +200,6 @@ The 100 points on this assignment are allotted as follows:
 Please submit your work using Gradescope.
 
 1. __Please submit your writeup as the file `writeup.pdf` in the Gradescope assignment Programming Assignment 4 (Writeup Submission).__
-2. __Please submit your code under the folder `code` in the Gradescope assignment Programming Assignment 4 (Code Submission).__  Just submit your full assignment 4 source tree. To keep submission sizes small, please do a `make clean` in the program directories prior to creating the archive, and remove any residual output, etc. Before submitting the source files, make sure that all code is compilable and runnable! We should be able to simply make, then execute your programs in the `/bfs` the `/pagerank` directories without manual intervention. 
+2. __Please submit your code under the folder `code` in the Gradescope assignment Programming Assignment 4 (Code Submission).__  Just submit your full assignment 4 source tree. To keep submission sizes small, please do a `make clean` in the program directories prior to creating the archive, and remove any residual output, etc. Before submitting the source files, make sure that all code is compilable and runnable! We should be able to simply make, then execute your programs in the `/bfs` the `/pagerank` directories without manual intervention.
 
-Our grading scripts will rerun the checker code allowing us to verify your score matches what you submitted in the `writeup.pdf`.  We might also try to run your code on other datasets to further examine its correctness. 
+Our grading scripts will rerun the checker code allowing us to verify your score matches what you submitted in the `writeup.pdf`.  We might also try to run your code on other datasets to further examine its correctness.
