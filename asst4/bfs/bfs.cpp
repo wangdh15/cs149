@@ -30,48 +30,6 @@ void vertex_set_free(vertex_set* list) {
 // Take one step of "top-down" BFS.  For each vertex on the frontier,
 // follow all outgoing edges, and add all neighboring vertices to the
 // new_frontier.
-void top_down_step_ref(
-    Graph g,
-    vertex_set* frontier,
-    vertex_set* new_frontier,
-    int* distances)
-{
-    #pragma omp parallel
-    {
-        int local_count = 0;
-        int* local_frontier = (int*)malloc(sizeof(int) * (g->num_nodes));
-
-        #pragma omp for schedule(dynamic, 200)
-        for (int i=0; i<frontier->count; i++) {
-
-            int node = frontier->vertices[i];
-
-            int start_edge = g->outgoing_starts[node];
-            int end_edge = (node == g->num_nodes - 1)
-                            ? g->num_edges
-                            : g->outgoing_starts[node + 1];
-
-            // attempt to add all neighbors to the new frontier
-            for (int neighbor=start_edge; neighbor<end_edge; neighbor++) {
-                int outgoing = g->outgoing_edges[neighbor];
-
-                if (distances[outgoing] == NOT_VISITED_MARKER &&
-                    __sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, distances[node] + 1)) {
-                    local_frontier[local_count++] = outgoing;
-                }
-           }
-        }
-
-        int start_idx = __sync_fetch_and_add(&new_frontier->count, local_count);
-        memcpy(new_frontier->vertices + start_idx, local_frontier, local_count * sizeof(int));
-        free(local_frontier);
-    }
-}
-
-
-// Take one step of "top-down" BFS.  For each vertex on the frontier,
-// follow all outgoing edges, and add all neighboring vertices to the
-// new_frontier.
 void top_down_step(
     Graph g,
     vertex_set* frontier,
@@ -79,12 +37,13 @@ void top_down_step(
     int* distances)
 {
 
-    #pragma omp parallel
+    #pragma omp parallel  // 分配若干个线程
     {
+        // 每个线程拥有一份变量
         vertex_set local_list;
         vertex_set_init(&local_list, g->num_edges);
 
-        #pragma omp for schedule(dynamic, 200)
+        #pragma omp for // 将下面的for循环的任务分配个不同的线程处理
         for (int i=0; i<frontier->count; i++) {
             int node = frontier->vertices[i];
             int start_edge = g->outgoing_starts[node];
@@ -98,13 +57,14 @@ void top_down_step(
             int new_dis = distances[node] + 1;
             for (int neighbor=start_edge; neighbor<end_edge; neighbor++) {
                 int outgoing = g->outgoing_edges[neighbor];
-                if (distances[outgoing] == NOT_VISITED_MARKER && __sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, new_dis)) {
+                if (distances[outgoing] == NOT_VISITED_MARKER && __sync_bool_compare_and_swap(&distances[outgoing], NOT_VISITED_MARKER, new_dis)) {  // 如果当前线程更新了的话，就加入到本线程的队列中
                     local_list.vertices[local_list.count++] = outgoing;
                 }
             }
         }
 
         // int start_idx = __sync_fetch_and_add(&new_frontier->count, local_list.count);
+        // 将本线程修改的内容放到全局的数组中，这个地方预申请全局数组的一部分区间
         int start_idx = new_frontier->count;
         while (!__sync_bool_compare_and_swap(&new_frontier->count, start_idx, start_idx + local_list.count)) {
             start_idx = new_frontier->count;
